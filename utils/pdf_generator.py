@@ -393,12 +393,12 @@ class PDFReportGenerator:
         auth_no_access = auth == "no access"
 
         # Per-patient eligibility value
-        elig_value = elig_checked.astype(float) + elig_see_notes.astype(float) / 6
+        elig_value = elig_checked.astype(float) + elig_see_notes.astype(float) / 4
 
         # Per-patient authorization value (only if eligibility is valid)
         auth_value = (
             (auth_done | auth_pending | auth_not_required).astype(float) * elig_valid.astype(float)
-            + (auth_see_notes | auth_no_access).astype(float) * elig_valid.astype(float) / 6
+            + (auth_see_notes | auth_no_access).astype(float) * elig_valid.astype(float) / 4
         )
 
         # For each patient, take the maximum of eligibility and authorization value
