@@ -370,7 +370,7 @@ class PDFReportGenerator:
         return metrics
     
     def _count_fully_processed_patients(self, df):
-        """Count fully processed patients"""
+        """Count fully processed patients, with partial credit (1/6) for 'See Notes' patients"""
         # Support both column name variants
         elig_col = self._get_column_variant(df, ["Eligibility Status", "Eligibility"])
         auth_col = self._get_column_variant(df, ["Authorization Status", "Authorization"])
@@ -390,7 +390,8 @@ class PDFReportGenerator:
                 |
                 ((elig == "checked") & (auth == "no access"))
             )
-            return fully_processed.sum()
+            see_notes_mask = (elig == "see notes") & (auth == "see notes")
+            return fully_processed.sum() + (see_notes_mask.sum() / 6)
         return 0
     
     def _get_column_variant(self, df, possible_names):

@@ -12,7 +12,7 @@ class MetricsCalculator:
     """Handles calculation of various dashboard metrics."""
     @staticmethod
     def count_fully_processed_patients(df):
-        """Return the number of fully processed patients."""
+        """Return the number of fully processed patients, with partial credit (1/6) for 'See Notes' patients."""
         elig_col = MetricsCalculator._get_column_variant(df, ["Eligibility Status", "Eligibility"])
         auth_col = MetricsCalculator._get_column_variant(df, ["Authorization Status", "Authorization"])
         if elig_col and auth_col:
@@ -22,7 +22,8 @@ class MetricsCalculator:
                 ((elig != "no access") & (elig != "") & (((auth != "no access") & (auth != "")) | (auth == "not required"))) |
                 ((elig == "checked") & (auth == "no access"))
             )
-            return fully_processed.sum()
+            see_notes_mask = (elig == "see notes") & (auth == "see notes")
+            return fully_processed.sum() + (see_notes_mask.sum() / 6)
         return 0
     @staticmethod
     def _get_column_variant(df, possible_names):
