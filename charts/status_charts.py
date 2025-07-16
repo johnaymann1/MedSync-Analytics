@@ -13,7 +13,7 @@ class StatusCharts:
     
     @staticmethod
     def create_eligibility_status_section(df):
-        """Create eligibility status counts and percentage chart"""
+        """Create eligibility status counts and percentage chart (case-insensitive)."""
         st.markdown('<div class="section-header">Eligibility Status Counts</div>', 
                    unsafe_allow_html=True)
         
@@ -22,19 +22,20 @@ class StatusCharts:
             st.info("No eligibility column found in the data.")
             return
         
-        # Show counts table
-        elig_counts = df[elig_col].value_counts(dropna=False)
+        # Normalize case for status values
+        elig_normalized = df[elig_col].fillna("").str.strip().str.lower()
+        elig_counts = elig_normalized.value_counts(dropna=False)
         elig_df = elig_counts.reset_index().rename(
             columns={"index": elig_col, elig_col: "Count"}
         )
-        st.dataframe(elig_df, use_container_width=True)
+        st.dataframe(elig_df, use_container_width=True, height=250)
         
         # Create percentage pie chart
         StatusCharts._create_eligibility_pie_chart(df, elig_col)
     
     @staticmethod
     def create_authorization_status_section(df):
-        """Create authorization status counts and percentage chart"""
+        """Create authorization status counts and percentage chart (case-insensitive)."""
         st.markdown('<div class="section-header">Authorization Status Counts</div>', 
                    unsafe_allow_html=True)
         
@@ -43,12 +44,13 @@ class StatusCharts:
             st.info("No authorization column found in the data.")
             return
         
-        # Show counts table
-        auth_counts = df[auth_col].value_counts(dropna=False)
+        # Normalize case for status values
+        auth_normalized = df[auth_col].fillna("").str.strip().str.lower()
+        auth_counts = auth_normalized.value_counts(dropna=False)
         auth_df = auth_counts.reset_index().rename(
             columns={"index": auth_col, auth_col: "Count"}
         )
-        st.dataframe(auth_df, use_container_width=True)
+        st.dataframe(auth_df, use_container_width=True, height=250)
         
         # Create percentage pie chart
         StatusCharts._create_authorization_pie_chart(df, auth_col)

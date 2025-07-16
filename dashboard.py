@@ -54,28 +54,35 @@ class MedSyncDashboard:
             StatusCharts.create_authorization_status_section(filtered_df)
         self._display_charts(filtered_df)
         if "Month" in filtered_df.columns and filtered_df["Month"].notna().any():
-            monthly_counts = filtered_df["Month"].value_counts().sort_index()
+            # Calculate fully processed patients per month
+            months = filtered_df["Month"].dropna().unique()
+            months = sorted(months)
+            fully_processed_per_month = []
+            for m in months:
+                month_df = filtered_df[filtered_df["Month"] == m]
+                count = MetricsCalculator.count_fully_processed_patients(month_df)
+                fully_processed_per_month.append(count)
             months_formatted = [
                 pd.Period(m).strftime('%B %Y') if m else str(m)
-                for m in monthly_counts.index
+                for m in months
             ]
-            above_800_col = [count - 800 if count > 800 else 0 for count in monthly_counts.values]
+            above_800_col = [count - 800 if count > 800 else 0 for count in fully_processed_per_month]
             df_all_months = pd.DataFrame({
                 "Month": months_formatted,
-                "Patient Count": monthly_counts.values,
+                "Fully Processed Patient Count": fully_processed_per_month,
                 "Above 800": above_800_col
             })
-            total_patients = monthly_counts.sum()
+            total_patients = sum(fully_processed_per_month)
             total_above_800 = sum(above_800_col)
             total_row = pd.DataFrame({
                 "Month": ["Total"],
-                "Patient Count": [total_patients],
+                "Fully Processed Patient Count": [total_patients],
                 "Above 800": [total_above_800]
             })
             df_all_months = pd.concat([df_all_months, total_row], ignore_index=True)
             st.markdown('<div class="section-header">Monthly Patient Counts (with Above 800)</div>', unsafe_allow_html=True)
             st.dataframe(df_all_months, use_container_width=True)
-        MetricsCalculator.create_performance_metrics(filtered_df)
+        MetricsCalculator.create_performance_metrics(filtered_df, use_fully_processed=True)
         DataTable.create_data_table_section(filtered_df)
 
     def _display_charts(self, filtered_df):

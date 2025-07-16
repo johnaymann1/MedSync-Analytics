@@ -370,29 +370,40 @@ class PDFReportGenerator:
         return metrics
     
     def _count_fully_processed_patients(self, df):
-        """Count fully processed patients, with partial credit (1/6) for 'See Notes' patients"""
-        # Support both column name variants
+        """Count patients so that each is counted only once, using eligibility and authorization rules with partial credit for 'See Notes'."""
         elig_col = self._get_column_variant(df, ["Eligibility Status", "Eligibility"])
         auth_col = self._get_column_variant(df, ["Authorization Status", "Authorization"])
-        
-        if elig_col and auth_col:
-            elig = df[elig_col].fillna("").str.strip().str.lower()
-            auth = df[auth_col].fillna("").str.strip().str.lower()
-            
-            fully_processed = (
-                (
-                    (elig != "no access") & (elig != "") &
-                    (
-                        ((auth != "no access") & (auth != "")) |
-                        (auth == "not required")
-                    )
-                )
-                |
-                ((elig == "checked") & (auth == "no access"))
-            )
-            see_notes_mask = (elig == "see notes") & (auth == "see notes")
-            return fully_processed.sum() + (see_notes_mask.sum() / 6)
-        return 0
+        if not (elig_col and auth_col):
+            return 0
+
+        elig = df[elig_col].fillna("").str.strip().str.lower()
+        auth = df[auth_col].fillna("").str.strip().str.lower()
+
+        # Eligibility logic
+        elig_checked = elig == "checked"
+        elig_see_notes = elig == "see notes"
+        elig_no_access = elig == "no access"
+        elig_valid = elig_checked | elig_see_notes
+
+        # Authorization logic
+        auth_done = auth == "done"
+        auth_pending = auth == "pending"
+        auth_not_required = auth == "not required"
+        auth_see_notes = auth == "see notes"
+        auth_no_access = auth == "no access"
+
+        # Per-patient eligibility value
+        elig_value = elig_checked.astype(float) + elig_see_notes.astype(float) / 6
+
+        # Per-patient authorization value (only if eligibility is valid)
+        auth_value = (
+            (auth_done | auth_pending | auth_not_required).astype(float) * elig_valid.astype(float)
+            + (auth_see_notes | auth_no_access).astype(float) * elig_valid.astype(float) / 6
+        )
+
+        # For each patient, take the maximum of eligibility and authorization value
+        patient_value = pd.DataFrame({'elig': elig_value, 'auth': auth_value}).max(axis=1)
+        return patient_value.sum()
     
     def _get_column_variant(self, df, possible_names):
         """Get the first available column name from a list of possibilities"""

@@ -12,19 +12,40 @@ class MetricsCalculator:
     """Handles calculation of various dashboard metrics."""
     @staticmethod
     def count_fully_processed_patients(df):
-        """Return the number of fully processed patients, with partial credit (1/6) for 'See Notes' patients."""
+        """Count patients so that each is counted only once, using eligibility and authorization rules with partial credit for 'See Notes'."""
         elig_col = MetricsCalculator._get_column_variant(df, ["Eligibility Status", "Eligibility"])
         auth_col = MetricsCalculator._get_column_variant(df, ["Authorization Status", "Authorization"])
-        if elig_col and auth_col:
-            elig = df[elig_col].fillna("").str.strip().str.lower()
-            auth = df[auth_col].fillna("").str.strip().str.lower()
-            fully_processed = (
-                ((elig != "no access") & (elig != "") & (((auth != "no access") & (auth != "")) | (auth == "not required"))) |
-                ((elig == "checked") & (auth == "no access"))
-            )
-            see_notes_mask = (elig == "see notes") & (auth == "see notes")
-            return fully_processed.sum() + (see_notes_mask.sum() / 6)
-        return 0
+        if not (elig_col and auth_col):
+            return 0
+
+        elig = df[elig_col].fillna("").str.strip().str.lower()
+        auth = df[auth_col].fillna("").str.strip().str.lower()
+
+        # Eligibility logic
+        elig_checked = elig == "checked"
+        elig_see_notes = elig == "see notes"
+        elig_no_access = elig == "no access"
+        elig_valid = elig_checked | elig_see_notes
+
+        # Authorization logic
+        auth_done = auth == "done"
+        auth_pending = auth == "pending"
+        auth_not_required = auth == "not required"
+        auth_see_notes = auth == "see notes"
+        auth_no_access = auth == "no access"
+
+        # Per-patient eligibility value
+        elig_value = elig_checked.astype(float) + elig_see_notes.astype(float) / 6
+
+        # Per-patient authorization value (only if eligibility is valid)
+        auth_value = (
+            (auth_done | auth_pending | auth_not_required).astype(float) * elig_valid.astype(float)
+            + (auth_see_notes | auth_no_access).astype(float) * elig_valid.astype(float) / 6
+        )
+
+        # For each patient, take the maximum of eligibility and authorization value
+        patient_value = pd.DataFrame({'elig': elig_value, 'auth': auth_value}).max(axis=1)
+        return patient_value.sum()
     @staticmethod
     def _get_column_variant(df, possible_names):
         """Get the first available column name from a list of possibilities."""
@@ -45,22 +66,29 @@ class MetricsCalculator:
             processed_count = MetricsCalculator.count_fully_processed_patients(df)
             st.metric("Fully Processed Patients", processed_count)
     @staticmethod
-    def create_performance_metrics(df):
-        """Display performance metrics section."""
+    def create_performance_metrics(df, use_fully_processed=False):
+        """Display performance metrics section. If use_fully_processed is True, use fully processed patient counts for averages."""
         st.markdown('<div class="section-header">Performance Metrics</div>', unsafe_allow_html=True)
         col1, col2, col3 = st.columns(3)
+        if use_fully_processed:
+            count_func = MetricsCalculator.count_fully_processed_patients
+        else:
+            count_func = lambda d: len(d)
         with col1:
-            avg_per_day = MetricsCalculator._calculate_avg_per_working_day(df)
-            st.metric("Avg Patients per Working Day (Sun-Thurs)", avg_per_day)
+            avg_per_day = MetricsCalculator._calculate_avg_per_working_day(df, count_func)
+            st.metric("Avg Fully Processed Patients per Working Day (Sun-Thurs)", avg_per_day)
         with col2:
-            avg_per_month = MetricsCalculator._calculate_avg_per_month(df)
-            st.metric("Avg Patients per Month", avg_per_month)
+            avg_per_month = MetricsCalculator._calculate_avg_per_month(df, count_func)
+            st.metric("Avg Fully Processed Patients per Month", avg_per_month)
         with col3:
-            avg_per_year = MetricsCalculator._calculate_avg_per_year(df)
-            st.metric("Avg Patients per Year", avg_per_year)
+            avg_per_year = MetricsCalculator._calculate_avg_per_year(df, count_func)
+            st.metric("Avg Fully Processed Patients per Year", avg_per_year)
+
     @staticmethod
-    def _calculate_avg_per_working_day(df):
+    def _calculate_avg_per_working_day(df, count_func=None):
         """Calculate average patients per working day."""
+        if count_func is None:
+            count_func = lambda d: len(d)
         if "Today's Date" not in df.columns or not df["Today's Date"].notna().any():
             return "N/A"
         min_date = df["Today's Date"].min().date()
@@ -68,30 +96,34 @@ class MetricsCalculator:
         all_days = pd.date_range(min_date, max_date)
         working_days = [d for d in all_days if d.weekday() in WORKING_DAYS]
         if len(working_days) > 0:
-            avg = len(df) / len(working_days)
+            avg = count_func(df) / len(working_days)
             return f"{avg:.1f}"
         return "N/A"
     @staticmethod
-    def _calculate_avg_per_month(df):
+    def _calculate_avg_per_month(df, count_func=None):
         """Calculate average patients per month."""
+        if count_func is None:
+            count_func = lambda d: len(d)
         if "Today's Date" not in df.columns or not df["Today's Date"].notna().any():
             return "N/A"
         min_date = df["Today's Date"].min()
         max_date = df["Today's Date"].max()
         all_months = pd.period_range(min_date, max_date, freq='M')
         if len(all_months) > 0:
-            avg = len(df) / len(all_months)
+            avg = count_func(df) / len(all_months)
             return f"{avg:.1f}"
         return "N/A"
     @staticmethod
-    def _calculate_avg_per_year(df):
+    def _calculate_avg_per_year(df, count_func=None):
         """Calculate average patients per year."""
+        if count_func is None:
+            count_func = lambda d: len(d)
         if "Today's Date" not in df.columns or not df["Today's Date"].notna().any():
             return "N/A"
         min_date = df["Today's Date"].min()
         max_date = df["Today's Date"].max()
         all_years = pd.period_range(min_date, max_date, freq='Y')
         if len(all_years) > 0:
-            avg = len(df) / len(all_years)
+            avg = count_func(df) / len(all_years)
             return f"{avg:.1f}"
         return "N/A"
