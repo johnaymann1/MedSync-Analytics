@@ -94,21 +94,21 @@ class MedSyncDashboard:
                 pd.Period(m).strftime('%B %Y') if m else str(m)
                 for m in months
             ]
-            above_800_col = [count - 800 if count > 800 else 0 for count in fully_processed_per_month]
+            above_720_col = [count - 720 if count > 720 else 0 for count in fully_processed_per_month]
             df_all_months = pd.DataFrame({
                 "Month": months_formatted,
                 "Fully Processed Patient Count": fully_processed_per_month,
-                "Above 800": above_800_col
+                "Above 720": above_720_col
             })
             total_patients = sum(fully_processed_per_month)
-            total_above_800 = sum(above_800_col)
+            total_above_720 = sum(above_720_col)
             total_row = pd.DataFrame({
                 "Month": ["Total"],
                 "Fully Processed Patient Count": [total_patients],
-                "Above 800": [total_above_800]
+                "Above 720": [total_above_720]
             })
             df_all_months = pd.concat([df_all_months, total_row], ignore_index=True)
-            st.markdown('<div class="section-header">Monthly Patient Counts (with Above 800)</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Monthly Patient Counts (with Above 720)</div>', unsafe_allow_html=True)
             st.dataframe(df_all_months, use_container_width=True)
         MetricsCalculator.create_performance_metrics(filtered_df, use_fully_processed=True)
         DataTable.create_data_table_section(filtered_df)

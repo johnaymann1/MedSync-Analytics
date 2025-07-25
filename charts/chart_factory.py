@@ -255,26 +255,26 @@ class ChartFactory:
         return fig
 
     @staticmethod
-    def create_months_above_800_chart(df):
-        """Bar chart: Number of patients per month (only months >800), and show total sum as annotation."""
+    def create_months_above_720_chart(df):
+        """Bar chart: Number of patients per month (only months >720), and show total sum as annotation."""
         if "Month" not in df.columns or not df["Month"].notna().any():
             return None
         
         monthly_counts = df["Month"].value_counts().sort_index()
-        above_800 = monthly_counts[monthly_counts > 800]
-        total_above_800 = above_800.sum()
-        if above_800.empty:
+        above_720 = monthly_counts[monthly_counts > 720]
+        total_above_720 = above_720.sum()
+        if above_720.empty:
             return None
         fig = px.bar(
-            x=above_800.index,
-            y=above_800.values,
-            title=f"Months with >800 Patients (Total: {total_above_800})",
+            x=above_720.index,
+            y=above_720.values,
+            title=f"Months with >720 Patients (Total: {total_above_720})",
             labels={"x": "Month", "y": "Number of Patients"},
-            color=above_800.values,
+            color=above_720.values,
             color_continuous_scale=COLOR_SCHEMES["blues"]
         )
         fig.add_annotation(
-            text=f"Total patients in months >800: {total_above_800}",
+            text=f"Total patients in months >720: {total_above_720}",
             xref="paper", yref="paper",
             x=0.5, y=1.08, showarrow=False,
             font=dict(size=16, color="#08519c")
