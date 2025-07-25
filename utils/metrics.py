@@ -12,7 +12,7 @@ class MetricsCalculator:
     """Handles calculation of various dashboard metrics."""
     @staticmethod
     def count_fully_processed_patients(df):
-        """Count patients so that each is counted only once, using eligibility and authorization rules with partial credit for 'See Notes'."""
+        """Count patients according to clarified eligibility and authorization rules (0.5 for checked+see notes/no access)."""
         elig_col = MetricsCalculator._get_column_variant(df, ["Eligibility Status", "Eligibility"])
         auth_col = MetricsCalculator._get_column_variant(df, ["Authorization Status", "Authorization"])
         if not (elig_col and auth_col):
@@ -21,31 +21,22 @@ class MetricsCalculator:
         elig = df[elig_col].fillna("").str.strip().str.lower()
         auth = df[auth_col].fillna("").str.strip().str.lower()
 
-        # Eligibility logic
-        elig_checked = elig == "checked"
-        elig_see_notes = elig == "see notes"
-        elig_no_access = elig == "no access"
-        elig_valid = elig_checked | elig_see_notes
+        def patient_score(e, a):
+            if e == "checked":
+                if a in ["done", "pending", "not required"]:
+                    return 1.0
+                elif a in ["see notes", "no access"]:
+                    return 0.5
+                elif a == "":
+                    return 0.0
+                else:
+                    return 0.0
+            elif e == "see notes":
+                return 0.25
+            else:
+                return 0.0
 
-        # Authorization logic
-        auth_done = auth == "done"
-        auth_pending = auth == "pending"
-        auth_not_required = auth == "not required"
-        auth_see_notes = auth == "see notes"
-        auth_no_access = auth == "no access"
-
-        # Per-patient eligibility value
-        elig_value = elig_checked.astype(float) + elig_see_notes.astype(float) / 4
-
-        # Per-patient authorization value (only if eligibility is valid)
-        auth_value = (
-            (auth_done | auth_pending | auth_not_required).astype(float) * elig_valid.astype(float)
-            + (auth_see_notes | auth_no_access).astype(float) * elig_valid.astype(float) / 4
-        )
-
-        # For each patient, take the maximum of eligibility and authorization value
-        patient_value = pd.DataFrame({'elig': elig_value, 'auth': auth_value}).max(axis=1)
-        return patient_value.sum()
+        return sum(patient_score(e, a) for e, a in zip(elig, auth))
     @staticmethod
     def _get_column_variant(df, possible_names):
         """Get the first available column name from a list of possibilities."""
