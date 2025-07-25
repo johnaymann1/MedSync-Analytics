@@ -58,21 +58,18 @@ class MedSyncDashboard:
             months = filtered_df["Month"].dropna().unique()
             months = sorted(months)
             def patient_score(e, a):
+                score = 0.0
+                # Eligibility
                 if e == "checked":
-                    if a in ["done", "pending", "not required"]:
-                        return 1.0
-                    elif a in ["see notes", "no access"]:
-                        return 0.5
-                    elif a == "":
-                        return 0.0
-                    else:
-                        return 0.0
+                    score += 0.5
                 elif e == "see notes":
-                    return 0.25
-                elif e == "no access" and a in ["done", "pending"]:
-                    return 0.5
-                else:
-                    return 0.0
+                    score += 0.25
+                # Authorization
+                if a in ["done", "pending"]:
+                    score += 0.5
+                elif a == "see notes":
+                    score += 0.25
+                return score
             fully_processed_per_month = []
             for m in months:
                 month_df = filtered_df[filtered_df["Month"] == m]
