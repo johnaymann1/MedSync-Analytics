@@ -54,13 +54,44 @@ class MedSyncDashboard:
             StatusCharts.create_authorization_status_section(filtered_df)
         self._display_charts(filtered_df)
         if "Month" in filtered_df.columns and filtered_df["Month"].notna().any():
-            # Calculate fully processed patients per month
+            # Calculate fully processed patients per month using the new logic
             months = filtered_df["Month"].dropna().unique()
             months = sorted(months)
+            def patient_score(e, a):
+                if e == "checked":
+                    if a in ["done", "pending", "not required"]:
+                        return 1.0
+                    elif a in ["see notes", "no access"]:
+                        return 0.5
+                    elif a == "":
+                        return 0.0
+                    else:
+                        return 0.0
+                elif e == "see notes":
+                    return 0.25
+                elif e == "no access" and a in ["done", "pending"]:
+                    return 0.5
+                else:
+                    return 0.0
             fully_processed_per_month = []
             for m in months:
                 month_df = filtered_df[filtered_df["Month"] == m]
-                count = MetricsCalculator.count_fully_processed_patients(month_df)
+                elig_col = None
+                auth_col = None
+                for col in ["Eligibility Status", "Eligibility"]:
+                    if col in month_df.columns:
+                        elig_col = col
+                        break
+                for col in ["Authorization Status", "Authorization"]:
+                    if col in month_df.columns:
+                        auth_col = col
+                        break
+                if elig_col and auth_col:
+                    elig = month_df[elig_col].fillna("").str.strip().str.lower()
+                    auth = month_df[auth_col].fillna("").str.strip().str.lower()
+                    count = sum(patient_score(e, a) for e, a in zip(elig, auth))
+                else:
+                    count = 0
                 fully_processed_per_month.append(count)
             months_formatted = [
                 pd.Period(m).strftime('%B %Y') if m else str(m)

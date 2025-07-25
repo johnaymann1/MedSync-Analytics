@@ -370,7 +370,7 @@ class PDFReportGenerator:
         return metrics
     
     def _count_fully_processed_patients(self, df):
-        """Count patients according to clarified eligibility and authorization rules (0.5 for checked+see notes/no access)."""
+        """Count patients using the new Medsync calculation logic everywhere in the PDF report."""
         elig_col = self._get_column_variant(df, ["Eligibility Status", "Eligibility"])
         auth_col = self._get_column_variant(df, ["Authorization Status", "Authorization"])
         if not (elig_col and auth_col):
@@ -378,7 +378,6 @@ class PDFReportGenerator:
 
         elig = df[elig_col].fillna("").str.strip().str.lower()
         auth = df[auth_col].fillna("").str.strip().str.lower()
-
         def patient_score(e, a):
             if e == "checked":
                 if a in ["done", "pending", "not required"]:
@@ -391,9 +390,10 @@ class PDFReportGenerator:
                     return 0.0
             elif e == "see notes":
                 return 0.25
+            elif e == "no access" and a in ["done", "pending"]:
+                return 0.5
             else:
                 return 0.0
-
         return sum(patient_score(e, a) for e, a in zip(elig, auth))
     
     def _get_column_variant(self, df, possible_names):
